@@ -1,11 +1,10 @@
 import * as path from 'path';
 import * as url from 'url';
 import throat from 'throat';
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { EventsEnum } from '../../utils/constant';
-import { delay } from '../../utils/delay';
-import { uuid } from '../../utils/uuid';
-import { Config } from '../../utils/config';
+import {app, BrowserWindow, ipcMain} from 'electron';
+import {EventsEnum} from '../../utils/constant';
+import {uuid} from '../../utils/uuid';
+import {Config} from '../../utils/config';
 
 type Info = {
   win: BrowserWindow;
@@ -42,45 +41,22 @@ export class WindowPool {
    * get a window with thread lock
    */
   private async get(): Promise<BrowserWindow> {
-    // if locked, delay and retry
-    if (this.locked) {
-      await delay();
-      return await this.get();
-    }
-
-    this.locked = true;
-
-    const win = await this.getAsync();
-
-    this.locked = false;
-
-    return win;
+    return await this.getAsync();
   }
 
   /**
    * get a window from pool, if not exist, create one, if pool is full, wait and retry
    */
   private async getAsync(): Promise<BrowserWindow> {
-    // find a idle window
-    let info: Info = this.pool.find((info) => info.idle);
-
-    // exist ide window, return it for usage
-    if (info) return info.win;
-
-    // no idle window
-    // and the pool is full, delay some time
-    if (this.isFull()) {
-      await delay();
-
-      return await this.getAsync();
+    if (this.pool.length) {
+      return this.pool[0].win
     }
 
     // pool has space, then create a new window instance
     const win = await this.create();
 
     // put it into pool
-    this.pool.push({ win, idle: true, tests: [] });
-
+    this.pool.push({win, idle: true, tests: []});
     return win;
   }
 
@@ -104,8 +80,8 @@ export class WindowPool {
 
       // when window close, save window size locally
       win.on('close', () => {
-        const { width, height } = win.getBounds();
-        config.write({ width, height });
+        const {width, height} = win.getBounds();
+        config.write({width, height});
       });
 
       // after window closed, remove it from pool for gc
@@ -115,7 +91,7 @@ export class WindowPool {
       });
 
       const f = url.format({
-        hash: encodeURIComponent(JSON.stringify({ debugMode: this.debugMode })),
+        hash: encodeURIComponent(JSON.stringify({debugMode: this.debugMode})),
         pathname: path.join(__dirname, '/index.html'),
         protocol: 'file:',
         slashes: true,
@@ -132,20 +108,6 @@ export class WindowPool {
         resolve(win);
       });
     });
-  }
-
-  /**
-   * the proc size of pool
-   */
-  public size() {
-    return this.pool.length;
-  }
-
-  /**
-   * whether the pool is full
-   */
-  public isFull() {
-    return this.size() >= this.maxSize;
   }
 
   /**
@@ -195,7 +157,7 @@ export class WindowPool {
    */
   public async runTest(id: string, test: any): Promise<any> {
     const win = await this.get();
-    const result =  await this.run(win, id, test);
+    const result = await this.run(win, id, test);
 
     this.appendTest(win, test);
     return result;
@@ -220,7 +182,7 @@ export class WindowPool {
         // test case running end, set the window with idle status
         this.setIdle(win, true);
         // resolve test result
-        resolve({ result, id });
+        resolve({result, id});
       });
 
       // send test case into web contents for running

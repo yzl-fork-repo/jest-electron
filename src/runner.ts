@@ -1,5 +1,5 @@
 import throat from 'throat';
-import { electronProc } from './electron/proc';
+import Electron from './electron/proc';
 
 const isDebugMode = (): boolean => {
   return process.env.DEBUG_MODE === '1';
@@ -19,7 +19,7 @@ export default class ElectronRunner {
   }
 
   private getConcurrency(testSize): number {
-    const { maxWorkers, watch, watchAll } = this._globalConfig;
+    const {maxWorkers, watch, watchAll} = this._globalConfig;
     const isWatch = watch || watchAll;
 
     const concurrency = Math.min(testSize, maxWorkers);
@@ -35,24 +35,30 @@ export default class ElectronRunner {
     onFailure: (Test, Error) => void,
   ) {
     const concurrency = this.getConcurrency(tests.length);
-
-    electronProc.debugMode = this._debugMode;
-    electronProc.concurrency = concurrency;
-
-    // when the process exit, kill then electron
-    process.on('exit', () => {
-      electronProc.kill();
-    });
-
-    if (this._debugMode) {
-      electronProc.onClose(() => { process.exit(); });
-    }
-
-    await electronProc.initialWin();
-
+    // await electronProc.initialWin();
     await Promise.all(
       tests.map(
         throat(concurrency, async (test, idx) => {
+          const electronProc = new Electron()
+          electronProc.debugMode = this._debugMode;
+          electronProc.concurrency = concurrency;
+
+          // not debug mode, then kill electron after running test cases
+          if (!this._debugMode) {
+            electronProc.kill();
+          }
+
+          // when the process exit, kill then electron
+          process.on('exit', () => {
+            electronProc.kill();
+          });
+
+          if (this._debugMode) {
+            electronProc.onClose(() => {
+              process.exit();
+            });
+          }
+
           onStart(test);
 
           const config = test.context.config;
@@ -73,10 +79,5 @@ export default class ElectronRunner {
         }),
       ),
     );
-
-    // not debug mode, then kill electron after running test cases
-    if (!this._debugMode) {
-      electronProc.kill();
-    }
   }
 }
