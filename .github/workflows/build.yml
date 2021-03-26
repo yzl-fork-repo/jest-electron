@@ -1,26 +1,24 @@
 name: build
 
-on: [push]
+on: [ push ]
 
 jobs:
   build:
-
-    runs-on: macOS-latest
-
     strategy:
       matrix:
-        node-version: [8.x, 10.x, 12.x]
-
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v1
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: npm install, build, and test
-      run: |
-        npm install
-        npm run build --if-present
-        npm test
-      env:
-        CI: true
+      - uses: actions/checkout@v2
+
+      - name: Install Xvfb
+        run: sudo apt-get install xvfb
+
+      - name: Install Packages
+        run: sudo npm install
+
+      - name: Run Build
+        run: sudo npm run build
+
+      - name: Run Test By Xvfb
+        run: sudo xvfb-run --auto-servernum npm run test
