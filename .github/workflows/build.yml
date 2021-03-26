@@ -11,14 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Install Xvfb
-        run: sudo apt-get install xvfb
-
       - name: Install Packages
         run: sudo npm install
 
       - name: Run Build
         run: sudo npm run build
+
+      - name: Install Xvfb
+        run: sudo apt-get install xvfb
 
       - name: Run Test By Xvfb
         run: sudo xvfb-run --auto-servernum npm run test
