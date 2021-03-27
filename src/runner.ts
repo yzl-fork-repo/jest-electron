@@ -43,15 +43,10 @@ export default class ElectronRunner {
     const worker = new ThreadPoolExecutor<[any, boolean, any, any2], ElectronResult>(async (test, isDebug, gConf, moduleMap) => {
       const path = require('path')
       // @ts-ignore
-      const {Electron} = require(path.resolve(__dirname, 'lib', 'electron', 'proc', 'index.js'))
+      const {Electron} = require('jest-electron-test/lib/electron/proc/index.js')
       const electronProc = new Electron()
       electronProc.debugMode = isDebug;
       electronProc.concurrency = 4;
-
-      // when the process exit, kill then electron
-      process.on('exit', () => {
-        electronProc.kill();
-      });
 
       if (isDebug) {
         electronProc.onClose(() => {
@@ -69,12 +64,14 @@ export default class ElectronRunner {
           globalConfig,
           path: test.path,
         })
+        electronProc.kill();
         return {
           testResult: tmpTest,
           test: test,
           error: null
         }
       } catch (e) {
+        electronProc.kill();
         return {
           test: null,
           testResult: null,
