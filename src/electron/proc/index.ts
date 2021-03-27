@@ -145,5 +145,3 @@ export class Electron {
     this.onCloseCallback = cb;
   }
 }
-
-export default Electron

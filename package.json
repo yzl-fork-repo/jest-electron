@@ -34,6 +34,7 @@
     "jest-runner": "~24.9.0",
     "jest-runtime": "~24.9.0",
     "jest-util": "~24.9.0",
+    "redamancy": "^0.0.2",
     "throat": "^5.0.0",
     "tslib": "^1.10.0"
   },

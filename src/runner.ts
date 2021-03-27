@@ -1,9 +1,15 @@
-import throat from 'throat';
-import Electron from './electron/proc';
+import {ThreadPoolExecutor} from "redamancy";
+import * as path from 'path'
 
 const isDebugMode = (): boolean => {
   return process.env.DEBUG_MODE === '1';
 };
+
+interface ElectronResult {
+  test: any
+  testResult: any
+  error: Error
+}
 
 
 /**
@@ -34,50 +40,70 @@ export default class ElectronRunner {
     onResult: (Test, TestResult) => void,
     onFailure: (Test, Error) => void,
   ) {
-    const concurrency = this.getConcurrency(tests.length);
     // await electronProc.initialWin();
-    await Promise.all(
-      tests.map(
-        throat(concurrency, async (test, idx) => {
-          const electronProc = new Electron()
-          electronProc.debugMode = this._debugMode;
-          electronProc.concurrency = concurrency;
 
-          // not debug mode, then kill electron after running test cases
-          if (!this._debugMode) {
-            electronProc.kill();
-          }
+    // @ts-ignore
+    const worker = new ThreadPoolExecutor<[any, boolean, any], ElectronResult>(async (test, isDebug, gConf) => {
+      const {Electron} = require(path.resolve(__dirname, 'electron', 'proc', 'index.js'))
+      const electronProc = new Electron()
+      electronProc.debugMode = isDebug;
+      electronProc.concurrency = 4;
 
-          // when the process exit, kill then electron
-          process.on('exit', () => {
-            electronProc.kill();
-          });
+      // when the process exit, kill then electron
+      process.on('exit', () => {
+        electronProc.kill();
+      });
 
-          if (this._debugMode) {
-            electronProc.onClose(() => {
-              process.exit();
-            });
-          }
+      if (isDebug) {
+        electronProc.onClose(() => {
+          process.exit();
+        });
+      }
 
-          onStart(test);
+      const config = test.context.config;
+      const globalConfig = gConf;
 
-          const config = test.context.config;
-          const globalConfig = this._globalConfig;
+      try {
+        const tmpTest = await electronProc.runTest({
+          serializableModuleMap: test.context.moduleMap.toJSON(),
+          config,
+          globalConfig,
+          path: test.path,
+        })
+        return {
+          testResult: tmpTest,
+          test: test,
+          error: null
+        }
+      } catch (e) {
+        return {
+          test: null,
+          testResult: null,
+          error: e
+        }
+      }
+    })
 
-          return await electronProc.runTest({
-            serializableModuleMap: test.context.moduleMap.toJSON(),
-            config,
-            globalConfig,
-            path: test.path,
-          }).then(testResult => {
-            testResult.failureMessage != null
-              ? onFailure(test, testResult.failureMessage)
-              : onResult(test, testResult);
-          }).catch(error => {
-            return onFailure(test, error);
-          });
-        }),
-      ),
-    );
+    worker.beforeEach((args) => {
+      onStart(args)
+    })
+
+    worker.afterEach((res) => {
+      if (res.error) {
+        onFailure(res.test, res.error)
+        return
+      }
+
+      if (res.testResult.failureMessage) {
+        onFailure(res.test, res.testResult.failureMessage)
+        return
+      }
+      onResult(res.test, res.testResult)
+    })
+
+
+    await Promise.all(tests.map(t => worker.execute(t, this._debugMode, this._globalConfig)));
+
+    worker.shutdown()
   }
 }
