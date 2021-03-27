@@ -3,7 +3,7 @@
     "module": "commonjs",
     "declaration": false,
     "sourceMap": true,
-    "target": "es5",
+    "target": "ESNext",
     "outDir": "lib",
     "allowSyntheticDefaultImports": true,
     "lib": ["esnext", "dom"],

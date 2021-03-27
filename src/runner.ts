@@ -1,5 +1,4 @@
 import {ThreadPoolExecutor} from "redamancy";
-import * as path from 'path'
 
 const isDebugMode = (): boolean => {
   return process.env.DEBUG_MODE === '1';
@@ -40,11 +39,11 @@ export default class ElectronRunner {
     onResult: (Test, TestResult) => void,
     onFailure: (Test, Error) => void,
   ) {
-    // await electronProc.initialWin();
-
     // @ts-ignore
-    const worker = new ThreadPoolExecutor<[any, boolean, any], ElectronResult>(async (test, isDebug, gConf) => {
-      const {Electron} = require(path.resolve(__dirname, 'electron', 'proc', 'index.js'))
+    const worker = new ThreadPoolExecutor<[any, boolean, any, any2], ElectronResult>(async (test, isDebug, gConf, moduleMap) => {
+      const path = require('path')
+      // @ts-ignore
+      const {Electron} = require(path.resolve(__dirname, 'lib', 'electron', 'proc', 'index.js'))
       const electronProc = new Electron()
       electronProc.debugMode = isDebug;
       electronProc.concurrency = 4;
@@ -65,7 +64,7 @@ export default class ElectronRunner {
 
       try {
         const tmpTest = await electronProc.runTest({
-          serializableModuleMap: test.context.moduleMap.toJSON(),
+          serializableModuleMap: moduleMap,
           config,
           globalConfig,
           path: test.path,
@@ -85,7 +84,7 @@ export default class ElectronRunner {
     })
 
     worker.beforeEach((args) => {
-      onStart(args)
+      onStart(args[0])
     })
 
     worker.afterEach((res) => {
@@ -102,8 +101,10 @@ export default class ElectronRunner {
     })
 
 
-    await Promise.all(tests.map(t => worker.execute(t, this._debugMode, this._globalConfig)));
+    const result = await Promise.all(tests.map(t => worker.execute(t, this._debugMode, this._globalConfig, t.context.moduleMap.toJSON())));
 
     worker.shutdown()
+
+    return result.map(res => res.testResult)
   }
 }
